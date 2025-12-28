@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sokoban Explorer</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #2d2d2d;
+            color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        canvas {
+            background-color: #3d3d3d;
+            border-radius: 4px;
+        }
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .key {
+            display: inline-block;
+            padding: 5px 10px;
+            background: #555;
+            border-radius: 4px;
+            margin: 0 2px;
+            font-family: monospace;
+        }
+        #status {
+            margin-top: 10px;
+            font-weight: bold;
+            color: #4caf50;
+            height: 24px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sokoban Explorer</h1>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="600" height="400"></canvas>
+    </div>
+    <div id="status"></div>
+    
+    <div class="controls-container">
+        <div class="level-controls">
+            <select id="levelSelect"></select>
+            <button id="newLevelBtn">New</button>
+            <button id="deleteLevelBtn">Delete</button>
+        </div>
+
+        <div class="editor-controls">
+            <div id="resizeControls" style="margin-top: 5px;">
+                <label>W: <input type="number" id="widthInput" value="10" min="3" max="50" style="width: 40px;"></label>
+                <label>H: <input type="number" id="heightInput" value="10" min="3" max="50" style="width: 40px;"></label>
+                <button id="resizeBtn">Resize</button>
+            </div>
+            <div id="palette" style="margin-top: 10px;">
+                <span class="palette-item selected" data-tile="#">Wall (#)</span>
+                <span class="palette-item" data-tile=" ">Floor ( )</span>
+                <span class="palette-item" data-tile=".">Target (.)</span>
+                <span class="palette-item" data-tile="$">Box ($)</span>
+                <span class="palette-item" data-tile="@">Player (@)</span>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <p>Use <span class="key">Arrow Keys</span> to move.</p>
+            <p>Use <span class="key">R</span> to reset.</p>
+            <p>Use <span class="key">Z</span> to undo.</p>
+            <p>Use <span class="key">S</span> to auto-solve.</p>
+            <div style="margin-top: 10px; display: flex; gap: 10px; justify-content: center;">
+                <button id="undoBtn" style="background: #FF9800;">Undo</button>
+                <button id="exploreBtn" style="background: #2196F3;">Explore Game Tree (3D)</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="graph-modal" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 100;">
+        <div id="graph-container" style="width: 100%; height: 100%;"></div>
+        <button id="graphUndoBtn" style="position: absolute; top: 20px; left: 20px; z-index: 101; background: #FF9800;">Undo (Z)</button>
+        <div style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 101; display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 20px;">
+            <span style="color: #ccc; font-size: 12px;">Zoom</span>
+            <input type="range" id="zoomSlider" min="100" max="2000" step="50" value="1000" style="width: 200px;">
+        </div>
+        <!-- Physics Control Panel -->
+        <div style="position: absolute; bottom: 80px; left: 20px; z-index: 101; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 8px; border: 1px solid #555; max-width: 300px;">
+            <h3 style="color: #fff; margin: 0 0 10px 0; font-size: 14px;">Physics Controls</h3>
+            <div style="display: grid; grid-template-columns: 1fr; gap: 8px;">
+                <div>
+                    <label style="color: #ccc; font-size: 11px; display: flex; justify-content: space-between;">
+                        <span>Repulsion</span><span id="chargeValue">-60</span>
+                    </label>
+                    <input type="range" id="chargeSlider" min="-500" max="-10" step="10" value="-60" style="width: 100%;">
+                </div>
+                <div>
+                    <label style="color: #ccc; font-size: 11px; display: flex; justify-content: space-between;">
+                        <span>Flatten (Z)</span><span id="zForceValue">0.5</span>
+                    </label>
+                    <input type="range" id="zForceSlider" min="0" max="2" step="0.1" value="0.5" style="width: 100%;">
+                </div>
+                <div>
+                    <label style="color: #ccc; font-size: 11px; display: flex; justify-content: space-between;">
+                        <span>Collision Radius</span><span id="collideValue">15</span>
+                    </label>
+                    <input type="range" id="collideSlider" min="5" max="50" step="5" value="15" style="width: 100%;">
+                </div>
+                <div>
+                    <label style="color: #ccc; font-size: 11px; display: flex; justify-content: space-between;">
+                        <span>Link Width</span><span id="linkWidthValue">3</span>
+                    </label>
+                    <input type="range" id="linkWidthSlider" min="1" max="10" step="0.5" value="3" style="width: 100%;">
+                </div>
+                <div>
+                    <label style="color: #ccc; font-size: 11px; display: flex; justify-content: space-between;">
+                        <span>Arrow Length</span><span id="arrowLengthValue">1</span>
+                    </label>
+                    <input type="range" id="arrowLengthSlider" min="0" max="20" step="1" value="1" style="width: 100%;">
+                </div>
+                <div>
+                    <label style="color: #ccc; font-size: 11px; display: flex; justify-content: space-between;">
+                        <span>Theta (Decay)</span><span id="thetaValue">0</span>
+                    </label>
+                    <input type="range" id="thetaSlider" min="0" max="0.9" step="0.1" value="0" style="width: 100%;">
+                </div>
+            </div>
+        </div>
+        <button id="closeGraphBtn" style="position: absolute; top: 20px; right: 20px; z-index: 101; background: #f44336;">Close (Esc)</button>
+        <div id="state-preview-overlay" style="display: none; position: absolute; bottom: 20px; left: 20px; background: rgba(0,0,0,0.8); padding: 10px; border: 1px solid #555; border-radius: 8px; pointer-events: none; z-index: 1000;">
+            <canvas id="previewCanvas"></canvas>
+            <div style="color: #ccc; text-align: center; margin-top: 5px; font-size: 12px;">Clicked Node State</div>
+        </div>
+    </div>
+
+    <style>
+        .controls-container {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .palette-item {
+            display: inline-block;
+            padding: 5px 10px;
+            border: 1px solid #555;
+            cursor: pointer;
+            margin: 0 2px;
+        }
+        .palette-item.selected {
+            background-color: #4caf50;
+            color: white;
+            border-color: #4caf50;
+        }
+        button, select {
+            padding: 5px 10px;
+            background: #444;
+            color: white;
+            border: 1px solid #666;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #555;
+        }
+    </style>
+    <script src="//unpkg.com/three@0.160.0/build/three.min.js"></script>
+    <script src="//unpkg.com/d3-dispatch"></script>
+    <script src="//unpkg.com/d3-quadtree"></script>
+    <script src="//unpkg.com/d3-octree"></script>
+    <script src="//unpkg.com/d3-force-3d"></script>
+    <script src="//unpkg.com/3d-force-graph"></script>
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>

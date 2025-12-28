@@ -1,0 +1,12 @@
+{
+  "name": "sokoban-explorer",
+  "version": "1.0.0",
+  "description": "Sokoban Game State Explorer",
+  "main": "src/main.js",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/test_logic.js"
+  },
+  "author": "",
+  "license": "ISC"
+}
