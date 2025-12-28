@@ -1,0 +1,40 @@
+name: Deploy to jhygate.github.io
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sokuban-explorer
+        uses: actions/checkout@v4
+
+      - name: Checkout jhygate.github.io deploy branch
+        uses: actions/checkout@v4
+        with:
+          repository: jhygate/jhygate.github.io
+          ref: deploy
+          token: ${{ secrets.JHYGATE_PAT }}
+          path: jhygate-deploy
+
+      - name: Update sokuban-explorer directory
+        run: |
+          # Remove old sokuban-explorer directory if it exists
+          rm -rf jhygate-deploy/sokuban-explorer
+          # Create directory structure
+          mkdir -p jhygate-deploy/sokuban-explorer
+          # Copy all files except .git, .github, and tests
+          rsync -av --exclude='.git' --exclude='.github' --exclude='tests' --exclude='.DS_Store' --exclude='.claude' --exclude='rebuild_ts' ./ jhygate-deploy/sokuban-explorer/
+
+      - name: Commit and push to deploy branch
+        run: |
+          cd jhygate-deploy
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add sokuban-explorer
+          git commit -m "Deploy sokuban-explorer to /sokuban-explorer"
+          git push
